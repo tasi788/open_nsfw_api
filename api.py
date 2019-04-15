@@ -1,4 +1,6 @@
 import asyncio
+import io
+from io import BytesIO
 
 import aiohttp
 import async_timeout
@@ -14,8 +16,10 @@ nsfw_net, caffe_transformer = load_model()
 
 
 def classify(image: bytes) -> np.float64:
-    scores = caffe_preprocess_and_compute(image, caffe_transformer=caffe_transformer, caffe_net=nsfw_net, output_layers=["prob"])
+    scores = caffe_preprocess_and_compute(
+        image, caffe_transformer=caffe_transformer, caffe_net=nsfw_net, output_layers=["prob"])
     return scores[1]
+
 
 async def fetch(session, url):
     with async_timeout.timeout(10):
@@ -24,15 +28,20 @@ async def fetch(session, url):
                 raise HTTPNotFound()
             return await response.read()
 
+
 class API(web.View):
     async def post(self):
         request = self.request
+        print(request)
         data = await request.post()
         try:
-            image = await fetch(session, data["url"])
+            if 'url' in data.keys():
+                image = await fetch(session, data["url"])
+            elif 'file' in data.keys():
+                image = data['file'].file.read()
             nsfw_prob = classify(image)
             text = nsfw_prob.astype(str)
-            return web.Response(text=text)
+            return web.json_response({'score': text})
         except KeyError:
             return HTTPBadRequest(text="Missing `url` POST parameter")
         except OSError as e:
