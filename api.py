@@ -41,12 +41,21 @@ class API(web.View):
                 image = data['file'].file.read()
             nsfw_prob = classify(image)
             text = nsfw_prob.astype(str)
-            return web.json_response({'score': text})
+            try:
+                inter = float(text)
+            except:
+                inter = -101
+            finally:
+                if inter < 1:
+                    return web.json_response({'status': False, 'reason': 'modle error'})
+                else:
+                    return web.json_response({'status': True, 'score': inter})
         except KeyError:
-            return HTTPBadRequest(text="Missing `url` POST parameter")
+            # return HTTPBadRequest(text="Missing `url` POST parameter")
+            return web.json_response({'status': False, 'reason': 'Missing `url` POST parameter'})
         except OSError as e:
             if "cannot identify" in str(e):
-                raise HTTPUnsupportedMediaType(text="Invalid image")
+                return web.json_response({'status': False, 'reason': 'Invalid image'})
             else:
                 raise e
 
